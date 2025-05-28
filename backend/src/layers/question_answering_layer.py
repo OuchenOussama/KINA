@@ -1,3 +1,4 @@
+from .translation_layer import translate_query
 from langchain_openai import ChatOpenAI
 import os
 import json
@@ -19,21 +20,26 @@ class QuestionAnsweringLayer:
             openai_api_key=os.getenv("OPENROUTER_API_KEY")
         )
 
-    def generate_answer(self, query: str, user_profile: dict, neo4j_results: list, hybrid_results: list, lang : str) -> str:
+    def generate_answer(self, query: str, flags: dict, neo4j_results: list, hybrid_results: list, lang : str) -> str:
         """Generate a natural language answer based on combined results."""
         try:
             context = f"Neo4j Results: {json.dumps(neo4j_results, indent=2)}\nHybrid Model Results: {json.dumps(hybrid_results, indent=2)}"
             qa_prompt = f"""
-You are a medical chatbot answering a medication-related question.
+You are a pharmaceutical medical chatbot answering a medication-related question, helping a pharmacist in treating a user's request.
 Query: {query}
-User Profile: {user_profile}
+Risk Flags based on User Profile: {flags}
 Context: {context}
-Provide a natural language answer summarizing the results, considering the user profile (e.g., age, pregnancy, allergies).
+Provide a natural language answer presenting the drugs. Do not mention retrieval methods, you're a pharmacist. 
 If the user's query is irrelevant or is not related to apothecary, do not include context and just ask for clarification.
-Language of your answer should be : {lang}.
+Return response in the form of Markdown text, no response title tho. Emphasize names with asteriscs and no bullet points.
+Give Info about each drug from the context, do not hallucinate.
 """
             response = self.llm.invoke(qa_prompt)
-            return response.content
+            if lang == 'en':
+                return response.content
+            else:
+                _, translated_response = translate_query(response.content, lang)
+                return translated_response
         except Exception as e:
             logger.error(f"Error generating answer: {e}")
             return "Sorry, I couldn't generate an answer due to an error."

@@ -1,32 +1,34 @@
 import logging
-from googletrans import Translator, LANGUAGES
+from deep_translator import GoogleTranslator
 from langdetect import detect, LangDetectException
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-def translate_query(query: str) -> str:
-    """Translate the input query to English if it's not already in English."""
+
+def translate_query(query: str, to_lang : str = "en") -> tuple[str, str]:
+    """Translate the input query."""
     try:
-        # Initialize translator
-        translator = Translator()
-        
         # Detect query language
         try:
             lang = detect(query)
-            logger.info(f"Detected language: {lang} ({LANGUAGES.get(lang, 'Unknown')})")
         except LangDetectException:
             logger.warning("Language detection failed, assuming English")
-            return "en", query
+            return 'en', query
 
-        # If language is not English, translate to English
-        if lang != 'en':
-            translation = translator.translate(query, dest='en')
-            logger.info(f"Translated query from {lang} to English: {translation.text}")
-            return translation.text
-        else:
-            logger.info("Query is already in English, no translation needed")
+        try:
+            translator = GoogleTranslator(source=lang, target=to_lang)
+            translated_text = translator.translate(query)
+            
+            if translated_text:
+                return lang, translated_text
+            else:
+                return lang, query
+                
+        except Exception as trans_error:
+            logger.error(f"Translation failed: {trans_error}")
+            logger.info("Returning original query")
             return lang, query
 
     except Exception as e:

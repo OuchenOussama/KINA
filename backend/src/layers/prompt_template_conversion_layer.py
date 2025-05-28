@@ -95,10 +95,10 @@ def convert_to_template(entities: ExtractedEntities) -> Optional[str]:
         query_parts = list(dict.fromkeys(query_parts))
 
         # Combine into a single query string
-        combined_query = ' '.join(query_parts) if query_parts else ''
+        combined_prompt = ' '.join(query_parts) if query_parts else ''
 
-        logger.info(f"Generated combined query: {combined_query}")
-        return combined_query
+        logger.info(f"Generated combined query: {combined_prompt}")
+        return combined_prompt
 
     except Exception as e:
         logger.error(f"Error in query conversion: {e}")

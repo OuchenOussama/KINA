@@ -14,6 +14,7 @@ langchain-openai
 neo4j
 flask-socketio
 gevent
-googletrans
 langdetect
 pyspellchecker
+deep-translator
+eventlet

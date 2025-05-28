@@ -23,7 +23,6 @@ class ExtractedEntities(BaseModel):
     therapeutic_class: Optional[List[str]] = Field(None, description="Therapeutic classes (e.g., antibiotics, analgesics, antihypertensives)")
     use: Optional[List[str]] = Field(None, description="Medical uses or indications (e.g., 'for pain relief', 'to treat infection')")
     price: Optional[List[float]] = Field(None, description="Specific price values mentioned (e.g., 'costs 25 dollars')")
-    language: Optional[List[str]] = Field(None, description="Language preferences or requirements (e.g., 'English instructions', 'Spanish label')")
     price_min: Optional[float] = Field(None, description="Minimum price mentioned (e.g., 'more than 10 dollars')")
     price_max: Optional[float] = Field(None, description="Maximum price mentioned (e.g., 'cheaper than 20 dollars')")
     sort_preference: Optional[str] = Field(None, description="Sorting preference (e.g., 'cheapest', 'most expensive', 'alphabetical')")
@@ -54,7 +53,6 @@ class NamedEntityRecognizer:
         "therapeutic_class": null,
         "use": null,
         "price": null,
-        "language": null,
         "price_min": 500.0,
         "price_max": null,
         "sort_preference": null,
@@ -77,7 +75,6 @@ class NamedEntityRecognizer:
         "therapeutic_class": ["antibiotics"],
         "use": null,
         "price": null,
-        "language": null,
         "price_min": null,
         "price_max": null,
         "sort_preference": "cheapest",
@@ -100,7 +97,6 @@ class NamedEntityRecognizer:
         "therapeutic_class": ["erectile dysfunction"],
         "use": null,
         "price": null,
-        "language": null,
         "price_min": null,
         "price_max": null,
         "sort_preference": "most expensive",
@@ -123,7 +119,6 @@ class NamedEntityRecognizer:
         "therapeutic_class": null,
         "use": null,
         "price": null,
-        "language": null,
         "price_min": null,
         "price_max": 15.0,
         "sort_preference": null,
@@ -146,7 +141,6 @@ class NamedEntityRecognizer:
         "therapeutic_class": null,
         "use": null,
         "price": null,
-        "language": null,
         "price_min": null,
         "price_max": null,
         "sort_preference": null,
@@ -169,7 +163,6 @@ class NamedEntityRecognizer:
         "therapeutic_class": null,
         "use": ["pain relief"],
         "price": [12.50],
-        "language": ["English"],
         "price_min": null,
         "price_max": null,
         "sort_preference": null,
@@ -218,6 +211,7 @@ Important guidelines:
 - Use null for entities not present in the query
 - Be precise in distinguishing between brand names, compositions, and therapeutic classes
 - Extract numeric values accurately for dosages and prices
+- If the query is gibberish or offensive, return an object with all values as null
 
 You MUST respond with valid JSON in this exact format:
 {{
@@ -233,7 +227,6 @@ You MUST respond with valid JSON in this exact format:
         "therapeutic_class": null,
         "use": null,
         "price": null,
-        "language": null,
         "price_min": null,
         "price_max": null,
         "sort_preference": null,

@@ -21,8 +21,15 @@ const PharmaceuticalChatbot = () => {
   const [processingSteps, setProcessingSteps] = useState([]);
   const [userProfile, setUserProfile] = useState({
     age: null,
+    weight: null,
     isPregnant: false,
+    isBreastfeeding: false,
     allergies: [],
+    medicalConditions: [],
+    currentMedications: [],
+    kidneyFunction: 'normal',
+    liverFunction: 'normal',
+    heartCondition: false
   });
   const [showProfile, setShowProfile] = useState(false);
   const messagesEndRef = useRef(null);
@@ -44,34 +51,64 @@ const PharmaceuticalChatbot = () => {
 
     // Listen for step updates
     socket.on('step_update', (data) => {
-      console.log('Step update received:', data); // Debug log
-      setProcessingSteps(prev => {
-        const stepIndex = prev.findIndex(s => s.step === data.step);
-        if (stepIndex === -1) return prev;
+      console.log('Step update received:', data);
+      console.log('Current steps before update:', processingSteps);
 
-        const updated = prev.map((s, index) => {
-          if (s.step === data.step) {
-            // Update current step to completed
-            return { ...s, status: 'completed', result: data.result };
-          } else if (index === stepIndex + 1 && s.status === 'waiting') {
-            // Set next step to processing
-            return { ...s, status: 'processing' };
+      setTimeout(() => {
+        setProcessingSteps(prev => {
+          console.log('Previous steps:', prev);
+
+          const updated = [...prev];
+          const completedStepIndex = updated.findIndex(s => s.step === data.step);
+          console.log(`Looking for step "${data.step}", found at index:`, completedStepIndex);
+
+          if (completedStepIndex !== -1) {
+            updated[completedStepIndex] = {
+              ...updated[completedStepIndex],
+              status: 'completed',
+              result: data.result,
+              completedAt: Date.now()
+            };
+
+            console.log(`Updated step "${data.step}" to completed`);
+
+            const nextStepIndex = completedStepIndex + 1;
+            if (nextStepIndex < updated.length && updated[nextStepIndex].status === 'waiting') {
+              updated[nextStepIndex] = {
+                ...updated[nextStepIndex],
+                status: 'processing',
+                startedAt: Date.now()
+              };
+              console.log(`Set next step "${updated[nextStepIndex].step}" to processing`);
+            }
+          } else {
+            console.log(`Step "${data.step}" not found in current steps!`);
+            console.log('Available steps:', prev.map(s => s.step));
           }
-          return s;
-        });
 
-        console.log('Updated steps:', updated); // Debug log
-        return updated;
-      });
+          console.log('Final updated steps:', updated);
+          return updated;
+        });
+      }, 0); // Zero delay to push to next event loop tick
     });
 
     // Listen for final response
     socket.on('final_response', (data) => {
+      // Mark all remaining steps as completed
+      setProcessingSteps(prev => prev.map(step => ({
+        ...step,
+        status: step.status === 'processing' || step.status === 'waiting'
+          ? 'completed'
+          : step.status,
+        completedAt: step.status !== 'completed' ? Date.now() : step.completedAt
+      })));
+
       const botMessage = {
         id: Date.now() + 1,
         type: 'bot',
         content: data.content,
         timestamp: new Date(),
+        lang: data.lang,
         metadata: {
           resultsCount: (data.neo4j_results?.length || 0) + (data.hybrid_results?.length || 0),
           processing_steps: data.metadata.processing_steps,
@@ -80,15 +117,26 @@ const PharmaceuticalChatbot = () => {
           hybrid_results: data.hybrid_results
         },
       };
+
       setMessages(prev => [...prev, botMessage]);
+
+      // Clear processing state after a short delay to show completion
       setTimeout(() => {
         setIsProcessing(false);
         setProcessingSteps([]);
-      }, 1000);
+      }, 2000);
     });
 
     // Listen for errors
     socket.on('error', (data) => {
+      // Mark current processing step as error
+      setProcessingSteps(prev => prev.map(step => {
+        if (step.status === 'processing') {
+          return { ...step, status: 'error', errorAt: Date.now() };
+        }
+        return step;
+      }));
+
       const errorMessage = {
         id: Date.now() + 1,
         type: 'bot',
@@ -96,9 +144,13 @@ const PharmaceuticalChatbot = () => {
         timestamp: new Date(),
         isError: true
       };
+
       setMessages(prev => [...prev, errorMessage]);
-      setIsProcessing(false);
-      setProcessingSteps([]);
+
+      setTimeout(() => {
+        setIsProcessing(false);
+        setProcessingSteps([]);
+      }, 2000);
     });
 
     // Cleanup on unmount
@@ -120,18 +172,20 @@ const PharmaceuticalChatbot = () => {
     setMessages(prev => [...prev, userMessage]);
     setIsProcessing(true);
 
-    // Initialize processing steps
-    setProcessingSteps([
-      { step: 'Translation', status: 'processing', timestamp: Date.now() },
-      { step: 'Spelling Correction', status: 'processing', timestamp: Date.now() },
-      { step: 'NER Extraction', status: 'processing', timestamp: Date.now() },
-      { step: 'Cypher Query', status: 'processing', timestamp: Date.now() },
-      { step: 'Neo4j Extraction', status: 'processing', timestamp: Date.now() },
-      { step: 'Query Template Conversion', status: 'processing', timestamp: Date.now() },
-      { step: 'Knowledge Retrieval', status: 'processing', timestamp: Date.now() },
-      { step: 'Safety Check', status: 'processing', timestamp: Date.now() },
-      { step: 'Answer Generation', status: 'processing', timestamp: Date.now() },
-    ]);
+    // Initialize processing steps with proper initial states
+    const initialSteps = [
+      { step: 'Translation', status: 'processing', startedAt: Date.now() },
+      { step: 'Spelling Correction', status: 'waiting' },
+      { step: 'NER Extraction', status: 'waiting' },
+      { step: 'Cypher Query', status: 'waiting' },
+      { step: 'Neo4j Extraction', status: 'waiting' },
+      { step: 'Knowledge Retrieval', status: 'waiting' },
+      { step: 'Safety Check', status: 'waiting' },
+      { step: 'Answer Generation', status: 'waiting' },
+    ];
+
+    console.log('Initializing steps:', initialSteps); // Debug log
+    setProcessingSteps(initialSteps);
 
     // Send query to server
     if (socketRef.current) {
@@ -142,14 +196,25 @@ const PharmaceuticalChatbot = () => {
     }
 
     setInputMessage('');
+    setUserProfile({
+      age: null,
+      weight: null,
+      isPregnant: false,
+      isBreastfeeding: false,
+      allergies: [],
+      medicalConditions: [],
+      currentMedications: [],
+      kidneyFunction: 'normal',
+      liverFunction: 'normal',
+      heartCondition: false
+    })
   };
-
 
   return (
     <div className="h-screen bg-white flex flex-col">
       {/* Header with Profile Toggle */}
       <div className="flex-shrink-0 border-b border-gray-300 p-3 flex justify-between items-center">
-        <div className="text-left">
+        <div className="text-left header-logo">
           <h1 className="text-lg font-bold text-black tracking-wide">KINA</h1>
           <p className="text-xs text-gray-600 mt-1">
             <span className="font-semibold">K</span>nowledge Graphs{' '}
