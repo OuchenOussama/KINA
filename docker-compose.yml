@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=production
+      - NEO4J_URI=${NEO4J_URI}
+      - NEO4J_USER=${NEO4J_USER}
+      - NEO4J_PASSWORD=${NEO4J_PASSWORD}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OPENROUTER_API_URL=${OPENROUTER_API_URL}
+      - NER_MODEL=${NER_MODEL}
+      - QA_MODEL=${QA_MODEL}
+    volumes:
+      - ./backend/hybrid_model_output:/usr/src/app/hybrid_model_output
+      - ./backend/src/data:/usr/src/app/data
+      - ./backend/src:/usr/src/app/src
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    networks:
+      - pharma-net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+    networks:
+      - pharma-net
+
+networks:
+  pharma-net:
+    driver: bridge
