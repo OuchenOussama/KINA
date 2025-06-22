@@ -24,7 +24,7 @@ services:
       - 8.8.8.8
       - 8.8.4.4
     networks:
-      - pharma-net
+      - kina-net
 
   frontend:
     build:
@@ -35,8 +35,8 @@ services:
     environment:
       - NODE_ENV=development
     networks:
-      - pharma-net
+      - kina-net
 
 networks:
-  pharma-net:
+  kina-net:
     driver: bridge

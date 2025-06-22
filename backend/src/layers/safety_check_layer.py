@@ -61,7 +61,7 @@ class EnhancedSafetyChecker:
                         }
                     },
                     'age_restrictions': {
-                        'pediatric': {'min_age': 16, 'risk': RiskLevel.CRITICAL, 'details': 'Risk of Reye’s syndrome'},
+                        'pediatric': {'min_age': 16, 'risk': RiskLevel.CRITICAL, 'details': 'Risk of Reye\'s syndrome'},
                         'geriatric': {'risk': RiskLevel.MEDIUM, 'details': 'Monitor for GI bleeding'}
                     },
                     'allergies': {
@@ -116,34 +116,62 @@ class EnhancedSafetyChecker:
         }
 
 def safety_check(
-    neo4j_results: List[Dict[str, Any]],
+    neo4j_results: Any,  # Changed from List to Any to handle strings
     hybrid_results: List[Dict[str, Any]],
     user_profile: Dict[str, Any],
-    entities: ExtractedEntities) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[SafetyFlag]]:
+    entities: ExtractedEntities) -> Tuple[Any, List[Dict[str, Any]], List[SafetyFlag]]:
     """Perform safety checks on Neo4j and hybrid results using predefined rules."""
     checker = EnhancedSafetyChecker()
-    filtered_neo4j = []
-    filtered_hybrid = []
     all_flags = []
 
     # Extract user data
     user_data = _extract_user_data(user_profile)
 
-    # Process Neo4j results
-    for result in neo4j_results:
-        drug_info = _extract_drug_info_neo4j(result)
-        flags = _check_drug_safety(drug_info, user_data, checker)
-        all_flags.extend(flags)
-        if _is_safe_to_recommend(flags):
-            filtered_neo4j.append(drug_info)
+    # Handle Neo4j results - they might be a formatted string or list
+    filtered_neo4j = neo4j_results  # For now, just pass through
+    if isinstance(neo4j_results, str):
+        # If it's a string (formatted results), we can't easily extract individual drugs
+        # So we'll just pass it through and flag it for manual review
+        logger.info("Neo4j results are in string format, passing through for LLM processing")
+        # We could try to parse the string to extract drug names, but it's complex
+        # For now, let's add a general safety flag
+        all_flags.append(SafetyFlag(
+            reason="Neo4j results require manual safety review",
+            risk_level=RiskLevel.LOW,
+            category="review_required",
+            details="Results are in text format and need LLM safety evaluation"
+        ))
+    elif isinstance(neo4j_results, list):
+        # Process as list of dictionaries
+        filtered_neo4j = []
+        for result in neo4j_results:
+            drug_info = _extract_drug_info_neo4j(result)
+            if drug_info['name'] != 'unknown':
+                flags = _check_drug_safety(drug_info, user_data, checker)
+                all_flags.extend(flags)
+                if _is_safe_to_recommend(flags):
+                    filtered_neo4j.append(result)
 
-    # Process hybrid results
-    for result in hybrid_results:
-        drug_info = _extract_drug_info_hybrid(result)
-        flags = _check_drug_safety(drug_info, user_data, checker)
-        all_flags.extend(flags)
-        if _is_safe_to_recommend(flags):
-            filtered_hybrid.append(drug_info)
+    # Process hybrid results (these should be a list)
+    filtered_hybrid = []
+    if isinstance(hybrid_results, list):
+        for result in hybrid_results:
+            drug_info = _extract_drug_info_hybrid(result)
+            if drug_info['name'] != 'unknown':
+                flags = _check_drug_safety(drug_info, user_data, checker)
+                all_flags.extend(flags)
+                if _is_safe_to_recommend(flags):
+                    filtered_hybrid.append(result)
+    else:
+        # If hybrid_results is not a list, treat it similarly to neo4j_results
+        logger.warning(f"Hybrid results are not a list: {type(hybrid_results)}")
+        filtered_hybrid = hybrid_results
+        all_flags.append(SafetyFlag(
+            reason="Hybrid results require manual safety review",
+            risk_level=RiskLevel.LOW,
+            category="review_required",
+            details="Results are not in expected list format"
+        ))
 
     return filtered_neo4j, filtered_hybrid, all_flags
 
@@ -168,27 +196,120 @@ def _extract_user_data(user_profile: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 def _extract_drug_info_neo4j(result: Dict[str, Any]) -> Dict[str, Any]:
-    """Extract drug information from Neo4j result."""
+    """Extract drug information from Neo4j result with improved error handling."""
     try:
-        brand_name = str(result.get('b', {}).get('name', '')).lower()
-        return {
-            'name': brand_name if brand_name else 'unknown',
-            'source': 'neo4j'
-        }
+        # Handle different data types
+        if isinstance(result, str):
+            # If result is just a string, use it as the drug name
+            drug_name = result.strip().lower()
+            if drug_name and len(drug_name) > 1:  # Avoid single character strings
+                return {'name': drug_name, 'source': 'neo4j'}
+            else:
+                logger.warning(f"Neo4j result is a short string: '{result}'")
+                return {'name': 'unknown', 'source': 'neo4j'}
+        
+        if not isinstance(result, dict):
+            logger.warning(f"Neo4j result is not a dict or string: {type(result)} - {result}")
+            return {'name': 'unknown', 'source': 'neo4j'}
+        
+        # Dictionary processing
+        drug_name = 'unknown'
+        
+        # Try different field names that might contain the drug name
+        possible_fields = [
+            'brand_name', 'name', 'drug_name', 'medication_name', 
+            'product_name', 'title', 'label'
+        ]
+        
+        for field in possible_fields:
+            if field in result and result[field]:
+                value = result[field]
+                if isinstance(value, str) and value.strip():
+                    drug_name = value.strip().lower()
+                    logger.debug(f"Found drug name '{drug_name}' in field '{field}'")
+                    break
+        
+        # If still no name found, try nested structures
+        if drug_name == 'unknown':
+            # Look for nested objects (like 'b' containing brand data)
+            for key, value in result.items():
+                if isinstance(value, dict):
+                    for nested_field in possible_fields:
+                        if nested_field in value and value[nested_field]:
+                            nested_value = value[nested_field]
+                            if isinstance(nested_value, str) and nested_value.strip():
+                                drug_name = nested_value.strip().lower()
+                                logger.debug(f"Found drug name '{drug_name}' in nested field '{key}.{nested_field}'")
+                                break
+                    if drug_name != 'unknown':
+                        break
+        
+        # Final fallback: look for any string value that might be a drug name
+        if drug_name == 'unknown':
+            for key, value in result.items():
+                if isinstance(value, str) and value.strip() and len(value.strip()) > 2:
+                    # Avoid very short strings or single characters
+                    potential_name = value.strip().lower()
+                    if not potential_name.isdigit():  # Avoid numeric values
+                        drug_name = potential_name
+                        logger.debug(f"Using fallback drug name '{drug_name}' from field '{key}'")
+                        break
+        
+        return {'name': drug_name, 'source': 'neo4j'}
+        
     except Exception as e:
         logger.error(f"Error extracting Neo4j drug info: {e}")
+        logger.error(f"Result type: {type(result)}")
+        logger.error(f"Result content: {result}")
         return {'name': 'unknown', 'source': 'neo4j'}
 
 def _extract_drug_info_hybrid(result: Any) -> Dict[str, Any]:
-    """Extract drug information from hybrid result (tuple format)."""
+    """Extract drug information from hybrid result with improved error handling."""
     try:
-        drug_name = str(result[0]).lower() if isinstance(result, tuple) and len(result) > 0 else 'unknown'
-        return {
-            'name': drug_name,
-            'source': 'hybrid'
-        }
+        drug_name = 'unknown'
+        
+        # Case 1: String format (most common)
+        if isinstance(result, str):
+            drug_name = result.strip().lower()
+            if drug_name and len(drug_name) > 1:
+                return {'name': drug_name, 'source': 'hybrid'}
+        
+        # Case 2: Tuple format (result[0] contains drug name)
+        elif isinstance(result, tuple) and len(result) > 0:
+            if isinstance(result[0], str):
+                drug_name = result[0].strip().lower()
+        
+        # Case 3: List format (take first element)
+        elif isinstance(result, list) and len(result) > 0:
+            if isinstance(result[0], str):
+                drug_name = result[0].strip().lower()
+        
+        # Case 4: Dictionary format
+        elif isinstance(result, dict):
+            # Try common field names for drug names
+            possible_fields = [
+                'brand_name', 'name', 'drug_name', 'medication_name',
+                'product_name', 'title', 'label'
+            ]
+            
+            for field in possible_fields:
+                if field in result and result[field]:
+                    value = result[field]
+                    if isinstance(value, str) and value.strip():
+                        drug_name = value.strip().lower()
+                        break
+        
+        # Validate the extracted name
+        if drug_name and drug_name != 'unknown' and len(drug_name) > 1 and not drug_name.isdigit():
+            return {'name': drug_name, 'source': 'hybrid'}
+        else:
+            logger.warning(f"Could not extract valid drug name from hybrid result: {type(result)} - {result}")
+            return {'name': 'unknown', 'source': 'hybrid'}
+        
     except Exception as e:
         logger.error(f"Error extracting hybrid drug info: {e}")
+        logger.error(f"Result type: {type(result)}")
+        logger.error(f"Result content: {result}")
         return {'name': 'unknown', 'source': 'hybrid'}
 
 def _check_drug_safety(
@@ -199,6 +320,10 @@ def _check_drug_safety(
     """Check drug safety based on predefined rules."""
     drug_name = drug_info['name'].lower()
     flags = []
+
+    # Skip processing for unknown drugs
+    if drug_name == 'unknown':
+        return flags
 
     # Check if drug is whitelisted
     if user_data['is_pregnant'] and drug_name in checker.safety_rules.get('whitelist', {}).get('pregnancy', {}):
@@ -278,10 +403,10 @@ def _check_drug_safety(
                     ))
 
             # Drug interactions
-            if 'drug_interactions' in rules:
+            if 'drug_interactions' in rules.get('contraindications', {}):
                 for med in user_data['current_medications']:
-                    if med in rules['drug_interactions']:
-                        interaction = rules['drug_interactions'][med]
+                    if med in rules['contraindications']['drug_interactions']:
+                        interaction = rules['contraindications']['drug_interactions'][med]
                         flags.append(SafetyFlag(
                             reason=f"Drug interaction: {drug_name} with {med}",
                             risk_level=interaction['risk'],
@@ -300,17 +425,16 @@ def _check_drug_safety(
                         details=dosage['pediatric']['details']
                     ))
 
-    # Flag unknown drugs
-    if not flags and drug_name != 'unknown':
-        found = any(drug_name == rule_drug or drug_name in checker.safety_rules['drugs'].get(rule_drug, {}).get('aliases', []) 
-                    for rule_drug in checker.safety_rules['drugs'])
-        if not found:
-            flags.append(SafetyFlag(
-                reason=f"Unknown drug: {drug_name}",
-                risk_level=RiskLevel.MEDIUM,
-                category="unknown",
-                details="Drug not found in safety database, consult physician"
-            ))
+            # If we found the drug in our rules, don't flag it as unknown
+            return flags
+
+    # Flag unknown drugs (only if not found in our safety rules)
+    flags.append(SafetyFlag(
+        reason=f"Unknown drug: {drug_name}",
+        risk_level=RiskLevel.MEDIUM,
+        category="unknown",
+        details="Drug not found in safety database, consult physician"
+    ))
 
     return flags
 

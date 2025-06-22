@@ -83,7 +83,7 @@ class NamedEntityRecognizer:
 }"""
             },
             {
-                "question": "Show me the 10 most expensive erectile dysfunction tablets",
+                "question": "Show me 10 erectile dysfunction tablets sorted by price.",
                 "answer": """{
     "entities": {
         "brand": null,
@@ -99,13 +99,13 @@ class NamedEntityRecognizer:
         "price": null,
         "price_min": null,
         "price_max": null,
-        "sort_preference": "most expensive",
+        "sort_preference": "price",
         "limit": 10
     }
 }"""
             },
             {
-                "question": "I'm looking for Tylenol in bottle form under 15 dollars",
+                "question": "I'm looking for Tylenol in bottle form under 15 Dirhams",
                 "answer": """{
     "entities": {
         "brand": ["Tylenol"],
@@ -149,7 +149,7 @@ class NamedEntityRecognizer:
 }"""
             },
             {
-                "question": "Show me pain relief medications that cost exactly 12.50 with English instructions",
+                "question": "Show me headache medications that cost exactly 12.50",
                 "answer": """{
     "entities": {
         "brand": null,
@@ -161,8 +161,30 @@ class NamedEntityRecognizer:
         "packaging": null,
         "form": null,
         "therapeutic_class": null,
-        "use": ["pain relief"],
+        "use": ["headache"],
         "price": [12.50],
+        "price_min": null,
+        "price_max": null,
+        "sort_preference": null,
+        "limit": null
+    }
+}"""
+            },
+                        {
+                "question": "Patient is suffering from erectile dysfunction.",
+                "answer": """{
+    "entities": {
+        "brand": null,
+        "composition": null,
+        "consideration": null,
+        "contraindication": null,
+        "dosage_value": null,
+        "dosage_unit": null,
+        "packaging": null,
+        "form": null,
+        "therapeutic_class": null,
+        "use": ["erectile dysfunction."],
+        "price": null,
         "price_min": null,
         "price_max": null,
         "sort_preference": null,
@@ -197,12 +219,11 @@ Your task is to extract the following entities from user questions about medicat
 9. **TherapeuticClass**: Therapeutic categories (e.g., antibiotics, analgesics)
 10. **Use**: Medical uses or indications (e.g., pain relief, infection treatment)
 11. **Price**: Specific price values mentioned (e.g., costs 25 dollars)
-12. **Language**: Language preferences (e.g., English instructions, Spanish label)
 
 Additional extraction:
 - **price_min**: Minimum price (e.g., "more than 10 dollars")
 - **price_max**: Maximum price (e.g., "cheaper than 20 dollars")
-- **sort_preference**: Sorting preference (cheapest, most expensive, etc.)
+- **sort_preference**: Sorting preference (cheapest, price, most expensive, expensive, alphabetical, alphabetically, reverse alphabetical)
 - **limit**: Number of results requested
 
 Important guidelines:
@@ -216,21 +237,21 @@ Important guidelines:
 You MUST respond with valid JSON in this exact format:
 {{
     "entities": {{
-        "brand": null,
-        "composition": null,
-        "consideration": null,
-        "contraindication": null,
-        "dosage_value": null,
-        "dosage_unit": null,
-        "packaging": null,
-        "form": null,
-        "therapeutic_class": null,
-        "use": null,
-        "price": null,
-        "price_min": null,
-        "price_max": null,
-        "sort_preference": null,
-        "limit": null
+        "brand": null or ["brand1", "brand2"],
+        "composition": null or ["ingredient1", "ingredient2"],
+        "consideration": null or ["warning1", "warning2"],
+        "contraindication": null or ["condition1", "condition2"],
+        "dosage_value": null or [500.0, 1000.0],
+        "dosage_unit": null or ["mg", "ml"],
+        "packaging": null or ["bottle", "box"],
+        "form": null or ["tablet", "syrup"],
+        "therapeutic_class": null or ["antibiotics", "analgesics"],
+        "use": null or ["pain relief", "infection"],
+        "price": null or [25.0, 30.0],
+        "price_min": null or 10.0,
+        "price_max": null or 50.0,
+        "sort_preference": null or "cheapest / price / most expensive / expensive / alphabetical / alphabetically / reverse alphabetical",
+        "limit": null or 5
     }}
 }}
 """

@@ -20,7 +20,7 @@ module.exports = {
         },
       },
       fontFamily : {
-        sans: ['Cairo', 'DMSerif', 'ui-sans-serif', 'system-ui'], 
+        sans: ['Cairo', 'Cascadia Mono', 'ui-sans-serif', 'system-ui'], 
       }
     },
   },

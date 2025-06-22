@@ -57,12 +57,18 @@ qa_layer = QuestionAnsweringLayer()
 # Initialize HybridPharmaceuticalKG
 try:
     hybrid_kg = HybridPharmaceuticalKG(
-        csv_path=os.path.join('data', '3rd_database_translated.csv'),
-        embedding_dim=64,
-        walk_length=50,
-        num_walks=5,
-        batch_size=16,
-        enable_text_embeddings=True
+        csv_path=os.path.join('data', '3rd_database_translated_clean_2.csv'),
+        embedding_model= 'pritamdeka/S-PubMedBERT-MS-MARCO',
+        embedding_dim= 768,
+        walk_length= 12,
+        num_walks= 16,
+        text_weight= 1.6279360961623448,
+        structure_weight= 1.5447160789430723,
+        batch_size= 48,
+        max_nodes_per_type= 50000,
+        use_precomputed= True,
+        enable_text_embeddings= True,
+        enable_node_embeddings= True
     )
     model_dir = os.path.join('hybrid_model_output')
     if os.path.exists(model_dir):
@@ -124,13 +130,13 @@ def handle_process_query(data):
         socketio.sleep(0)  # Force immediate flush
 
         # Layer 5: Neo4j Extraction
-        neo4j_results = neo4j_layer.execute_query(cypher_query)
-        emit('step_update', {'step': 'Neo4j Extraction', 'status': 'completed', 'result': f"{len(neo4j_results)} results"})
+        neo4j_results, num_neo4j_results = "", 0 #neo4j_layer.execute_query(cypher_query)
+        emit('step_update', {'step': 'Neo4j Extraction', 'status': 'completed', 'result': f"{num_neo4j_results} results"})
         socketio.sleep(0)
 
         # Layer 6: Prompt Template Conversion & Knowledge Retrieval
         combined_prompt = convert_to_template(entities)
-        hybrid_results = hybrid_kg.find_drugs_smart(query=combined_prompt, k=10)
+        hybrid_results = hybrid_kg.find_drugs_smart(query=combined_prompt, k=(data['k'] if data['k'] else 10))
         emit('step_update', {'step': 'Knowledge Retrieval', 'status': 'completed', 'result': f"{len(hybrid_results)} results"})
         socketio.sleep(0)
 
@@ -150,6 +156,7 @@ def handle_process_query(data):
             "entities": entities.model_dump(),
             "neo4j_results": filtered_neo4j,
             "hybrid_results": filtered_hybrid,
+            "resultsCount": len(filtered_hybrid)  + num_neo4j_results,
             "lang": lang,
             "metadata": {
                 "processing_steps": [

@@ -7,7 +7,7 @@ const EntitiesModal = ({ isOpen, onClose, entities }) => {
   const filteredEntities = Object.entries(entities).reduce((acc, [type, value]) => {
     if (Array.isArray(value) && value.length > 0) {
       value.forEach((val, index) => {
-        if (val) acc.push({ type: `${type} ${index + 1}`, value: val });
+        if (val) acc.push({ type: type, value: val });
       });
     } else if (value !== null && value !== undefined && value !== '') {
       acc.push({ type, value });
@@ -21,7 +21,7 @@ const EntitiesModal = ({ isOpen, onClose, entities }) => {
         <div className="px-8 py-6 border-b border-gray-100">
           <h2 className="text-xl font-light text-gray-900 tracking-wide">Extracted Entities</h2>
         </div>
-        
+
         <div className="px-8 py-6 max-h-96 overflow-y-auto">
           {filteredEntities.length > 0 ? (
             <div className="space-y-4">
@@ -52,7 +52,7 @@ const EntitiesModal = ({ isOpen, onClose, entities }) => {
             </div>
           )}
         </div>
-        
+
         <div className="px-8 py-6 bg-gray-50 border-t border-gray-100">
           <button
             onClick={onClose}

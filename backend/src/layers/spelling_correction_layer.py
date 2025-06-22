@@ -171,15 +171,3 @@ def correct_spelling(query: str) -> str:
     except Exception as e:
         logger.error(f"Spelling correction error: {e}")
         return query
-
-# Example usage (for testing purposes)
-if __name__ == "__main__":
-    test_queries = [
-        "I have a migrane and took paracetomol",
-        "My dick hurts and I have the clap",
-        "Feeling shits and pissing blood",
-        "High blod presure and diabeetes"
-    ]
-    for query in test_queries:
-        result = correct_spelling(query)
-        print(f"Original: {query}\nCorrected: {result}\n")

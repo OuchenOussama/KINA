@@ -31,6 +31,10 @@ const PharmaceuticalChatbot = () => {
     liverFunction: 'normal',
     heartCondition: false
   });
+
+  const [k, setK] = useState(5);
+
+
   const [showProfile, setShowProfile] = useState(false);
   const messagesEndRef = useRef(null);
   const socketRef = useRef(null);
@@ -110,7 +114,7 @@ const PharmaceuticalChatbot = () => {
         timestamp: new Date(),
         lang: data.lang,
         metadata: {
-          resultsCount: (data.neo4j_results?.length || 0) + (data.hybrid_results?.length || 0),
+          resultsCount: (data.resultsCount || 0),
           processing_steps: data.metadata.processing_steps,
           entities: data.entities,
           neo4j_results: data.neo4j_results,
@@ -121,10 +125,8 @@ const PharmaceuticalChatbot = () => {
       setMessages(prev => [...prev, botMessage]);
 
       // Clear processing state after a short delay to show completion
-      setTimeout(() => {
-        setIsProcessing(false);
-        setProcessingSteps([]);
-      }, 2000);
+      setIsProcessing(false);
+      setProcessingSteps([]);
     });
 
     // Listen for errors
@@ -191,7 +193,8 @@ const PharmaceuticalChatbot = () => {
     if (socketRef.current) {
       socketRef.current.emit('process_query', {
         query: inputMessage,
-        userProfile: userProfile
+        userProfile: userProfile,
+        k:k,
       });
     }
 
@@ -214,14 +217,49 @@ const PharmaceuticalChatbot = () => {
     <div className="h-screen bg-white flex flex-col">
       {/* Header with Profile Toggle */}
       <div className="flex-shrink-0 border-b border-gray-300 p-3 flex justify-between items-center">
-        <div className="text-left header-logo">
-          <h1 className="text-lg font-bold text-black tracking-wide">KINA</h1>
-          <p className="text-xs text-gray-600 mt-1">
-            <span className="font-semibold">K</span>nowledge Graphs{' '}
-            <span className="font-semibold">I</span>ntegrated with{' '}
-            <span className="font-semibold">N</span>LP for{' '}
-            <span className="font-semibold">A</span>pothecary
-          </p>
+        <div class="flex items-center gap-4 logo-container">
+          <div class="relative w-12 h-12 flex-shrink-0">
+            <svg class="k-svg" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse">
+                  <path d="M 10 0 L 0 0 0 10" fill="none" stroke="#e2e8f0" stroke-width="0.5" opacity="0.3" />
+                </pattern>
+              </defs>
+              <rect width="120" height="120" fill="url(#grid)" />
+
+              <line class="edge" x1="20" y1="20" x2="20" y2="100" />
+              <line class="edge" x1="20" y1="20" x2="70" y2="50" />
+              <line class="edge" x1="20" y1="60" x2="70" y2="50" />
+              <line class="edge" x1="20" y1="60" x2="90" y2="90" />
+              <line class="edge" x1="70" y1="50" x2="100" y2="20" />
+              <line class="edge" x1="70" y1="50" x2="90" y2="90" />
+              <line class="edge" x1="100" y1="20" x2="90" y2="90" />
+
+              <line class="edge" x1="20" y1="100" x2="50" y2="85" opacity="0.4" />
+              <line class="edge" x1="50" y1="85" x2="90" y2="90" opacity="0.4" />
+              <line class="edge" x1="70" y1="50" x2="85" y2="35" opacity="0.4" />
+
+              <path class="k-structure" d="M 20 20 L 20 100 M 20 60 L 100 20 M 20 60 L 90 90" />
+
+              <circle class="node" cx="20" cy="20" r="6" />
+              <circle class="node" cx="20" cy="60" r="6" />
+              <circle class="node" cx="20" cy="100" r="6" />
+              <circle class="node" cx="70" cy="50" r="6" />
+              <circle class="node" cx="100" cy="20" r="6" />
+              <circle class="node" cx="90" cy="90" r="6" />
+              <circle class="node" cx="50" cy="85" r="4" />
+              <circle class="node" cx="85" cy="35" r="4" />
+            </svg>
+          </div>
+          <div className="text-left header-logo">
+            <h1 className="text-lg font-bold text-gray-800 tracking-wide">KINA</h1>
+            <p className="text-xs text-gray-600 mt-1">
+              <span className="font-bold">K</span>nowledge Graphs{' '}
+              <span className="font-bold">I</span>ntegrated with{' '}
+              <span className="font-bold">N</span>LP for{' '}
+              <span className="font-bold">A</span>pothecary
+            </p>
+          </div>
         </div>
         <button
           onClick={() => setShowProfile(!showProfile)}
@@ -257,6 +295,7 @@ const PharmaceuticalChatbot = () => {
           setInputMessage={setInputMessage}
           handleSendMessage={handleSendMessage}
           isProcessing={isProcessing}
+          setK={setK}
         />
       </div>
     </div>
