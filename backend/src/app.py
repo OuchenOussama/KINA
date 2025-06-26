@@ -60,17 +60,17 @@ try:
         csv_path=os.path.join('data', '3rd_database_translated_clean_2.csv'),
         embedding_model= 'pritamdeka/S-PubMedBERT-MS-MARCO',
         embedding_dim= 768,
-        walk_length= 12,
-        num_walks= 16,
-        text_weight= 1.6279360961623448,
-        structure_weight= 1.5447160789430723,
+        walk_length= 7,
+        num_walks= 18,
+        text_weight=  1.5896998028529472,
+        structure_weight=  0.9948339938743394,
         batch_size= 48,
         max_nodes_per_type= 50000,
         use_precomputed= True,
         enable_text_embeddings= True,
         enable_node_embeddings= True
     )
-    model_dir = os.path.join('hybrid_model_output')
+    model_dir = os.path.join('embeddings')
     if os.path.exists(model_dir):
         logger.info("Loading pre-trained hybrid model...")
         try:
@@ -130,7 +130,7 @@ def handle_process_query(data):
         socketio.sleep(0)  # Force immediate flush
 
         # Layer 5: Neo4j Extraction
-        neo4j_results, num_neo4j_results = "", 0 #neo4j_layer.execute_query(cypher_query)
+        neo4j_results, num_neo4j_results = neo4j_layer.execute_query(cypher_query)
         emit('step_update', {'step': 'Neo4j Extraction', 'status': 'completed', 'result': f"{num_neo4j_results} results"})
         socketio.sleep(0)
 

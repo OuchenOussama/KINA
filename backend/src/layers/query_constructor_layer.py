@@ -104,7 +104,7 @@ class DrugDatabaseSearch(BaseModel):
         if self.use_search:
             query_parts.append("MATCH (b)-[:TREATS]->(u:Use)")
             relationships_added.add("u")
-            where_conditions.append(f"toLower(u.name) CONTAINS toLower('{self.use_search}')")
+            where_conditions.append(f"toLower(u.description) CONTAINS toLower('{self.use_search}')")
 
         if self.drug_name_search:
             where_conditions.append(f"toLower(b.name) CONTAINS toLower('{self.drug_name_search}')")
@@ -145,9 +145,9 @@ RETURN DISTINCT b.name as brand_name,
        collect(DISTINCT CASE WHEN d.value IS NOT NULL THEN toString(d.value) + ' ' + COALESCE(d.unit, '') ELSE null END) as dosages,
        collect(DISTINCT p.form) as forms,
        collect(DISTINCT p.packaging) as packaging,
-       collect(DISTINCT u.name) as uses,
-       collect(DISTINCT con.name) as considerations,
-       collect(DISTINCT contra.name) as contraindications"""
+       collect(DISTINCT u.description) as uses,
+       collect(DISTINCT con.description) as considerations,
+       collect(DISTINCT contra.description) as contraindications"""
 
         query_parts.append(return_clause)
 

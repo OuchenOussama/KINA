@@ -17,7 +17,7 @@ services:
       - NER_MODEL=${NER_MODEL}
       - QA_MODEL=${QA_MODEL}
     volumes:
-      - ./backend/hybrid_model_output:/usr/src/app/hybrid_model_output
+      - ./backend/embeddings:/usr/src/app/embeddings
       - ./backend/src/data:/usr/src/app/data
       - ./backend/src:/usr/src/app/src
     dns:

@@ -175,22 +175,24 @@ class HybridPharmaceuticalKG:
 
             node_type, node_value = node_name.split(':', 1)
             node_type_templates = {
-                'TherapeuticClass': f"in therapeutic class {node_value}",
-                'Contraindications': f"contraindicated in {node_value}",
-                'Form': f"pharmaceutical form of {node_value}",
-                'Packaging': f"packaged as {node_value}",
-                'Considerations': f"clinical consideration {node_value}",
-                'Uses': f"indicated for {node_value}",
-                'Composition': f"contains active ingredient {node_value}",
-                'Dosage': f"dosage strength of {node_value}"
+                'TherapeuticClass': [f"under therapeutic class of {node_value}"],
+                'Contraindications': [f"contraindicated in {node_value}"],
+                'Form': [f"form of {node_value}"],
+                'Packaging': [f"packaged as {node_value}"],
+                'Considerations': [f"requires consideration {node_value}"],
+                'Uses': [f"treatment of {node_value}"],
+                'Composition': [f"contains active ingredient {node_value}"],
+                'Dosage': [f"dosage strength of {node_value}"],
+                # 'Price': f"sold for {node_value}"
             }
-
-            template = node_type_templates.get(node_type, f"pharmaceutical attribute {node_value}")
+            
+            templates = node_type_templates.get(node_type, [f"pharmaceutical attribute {node_value}"])
             if node_type in ['Uses', 'Considerations', 'Contraindications']:
                 actual_text = self._get_actual_node_content(node_name)
                 if actual_text and len(actual_text) > 10:
-                    return f"{template}. {actual_text}"
-            return template
+                    return f"{templates[0]}. {actual_text}"  # ← Use templates[0]
+            return templates[0] 
+        
         except Exception as e:
             logger.error(f"Error extracting node text for {node_name}: {e}")
             return ""
@@ -495,23 +497,24 @@ class HybridPharmaceuticalKG:
             logger.error(f"Error loading model: {e}")
             raise
 
-    def find_drugs_smart(self, query: str, k: int = 10) -> List[Tuple[str, float, List[str]]]:
+    def find_drugs_smart(self, query: str, k: int = 10) -> List[Tuple[str, float, List[str], Dict[str, List[str]]]]:
         """
-        Find drugs matching the query using hybrid search.
+        Find drugs matching the query using hybrid search with immediate node information.
         
         Args:
             query: User query string
             k: Number of results to return
             
         Returns:
-            List of tuples (drug_name, score, reasons)
+            List of tuples (drug_name, score, reasons, immediate_nodes_info)
+            where immediate_nodes_info is a dict with keys like 'Composition', 'TherapeuticClass', etc.
         """
         if not self.enable_node_embeddings and not self.enable_text_embeddings:
             logger.error("Both embeddings disabled. Cannot perform search.")
             return []
 
         if (self.enable_node_embeddings and not self.index_structural) or \
-           (self.enable_text_embeddings and not self.index_text):
+        (self.enable_text_embeddings and not self.index_text):
             logger.error("Required indices not built. Please load model first.")
             return []
 
@@ -564,7 +567,12 @@ class HybridPharmaceuticalKG:
                 except Exception as e:
                     logger.warning(f"Error in text search: {e}")
 
-            final_results = [(drug, score, reasons) for drug, (score, reasons) in drug_results.items()]
+            # Get immediate nodes information for each drug
+            final_results = []
+            for drug, (score, reasons) in drug_results.items():
+                immediate_nodes_info = self._get_immediate_nodes_info(drug)
+                final_results.append((drug, score, reasons, immediate_nodes_info))
+            
             final_results.sort(key=lambda x: x[1], reverse=True)
             
             gc.collect()
@@ -572,6 +580,63 @@ class HybridPharmaceuticalKG:
         except Exception as e:
             logger.error(f"Error in find_drugs_smart: {e}")
             return []
+
+    def _get_immediate_nodes_info(self, drug_name: str) -> Dict[str, List[str]]:
+        """
+        Get immediate neighboring nodes information for a drug.
+        
+        Args:
+            drug_name: Name of the drug (BrandName node)
+            
+        Returns:
+            Dictionary with node types as keys and lists of values as values
+        """
+        immediate_info = {
+            'Composition': [],
+            'TherapeuticClass': [],
+            'Price': [],
+            'Dosage': [],
+            'Uses': [],
+            'Contraindications': [],
+            'Considerations': [],
+            'Form': [],
+            'Packaging': []
+        }
+        
+        try:
+            if drug_name not in self.G:
+                logger.warning(f"Drug {drug_name} not found in graph")
+                return immediate_info
+                
+            # Get all neighbors of the drug
+            neighbors = list(self.G.neighbors(drug_name))
+            
+            for neighbor in neighbors:
+                # Extract node type and value
+                if ':' in neighbor:
+                    node_type, node_value = neighbor.split(':', 1)
+                    
+                    if node_type in immediate_info:
+                        # For text-based nodes (Uses, Considerations, etc.), get actual content
+                        if node_type in ['Uses', 'Considerations', 'Contraindications', 'Packaging', 'Form']:
+                            actual_content = self._get_actual_node_content(neighbor)
+                            if actual_content:
+                                immediate_info[node_type].append(actual_content)
+                            else:
+                                # Fallback to node value if actual content not available
+                                immediate_info[node_type].append(node_value)
+                        else:
+                            # For categorical nodes, use the value directly
+                            immediate_info[node_type].append(node_value)
+            
+            # Remove duplicates while preserving order
+            for key in immediate_info:
+                immediate_info[key] = list(dict.fromkeys(immediate_info[key]))
+                
+        except Exception as e:
+            logger.error(f"Error getting immediate nodes info for {drug_name}: {e}")
+        
+        return immediate_info
 
     def clear_memory(self):
         """Clear memory-intensive components but keep FAISS indices."""

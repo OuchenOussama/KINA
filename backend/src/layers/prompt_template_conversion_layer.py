@@ -50,10 +50,14 @@ def convert_to_template(entities: ExtractedEntities) -> Optional[str]:
             for form in entities.form:
                 query_parts.append(f"pharmaceutical form of {form}")
 
-        # Dosage (value and unit)
-        if entities.dosage_value and entities.dosage_unit:
-            dosage_str = f"dosage strength of {entities.dosage_value[0]} {entities.dosage_unit[0]}"
-            query_parts.append(dosage_str)
+        # # Price
+        # if entities.price:
+        #         query_parts.append(f"sold for {entities.price}")
+
+        # # Dosage (value and unit)
+        # if entities.dosage_value and entities.dosage_unit:
+        #     dosage_str = f"dosage strength of {entities.dosage_value[0]} {entities.dosage_unit[0]}"
+        #     query_parts.append(dosage_str)
 
         # Packaging
         if entities.packaging:
